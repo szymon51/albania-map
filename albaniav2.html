@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Albania: mapa turystyczna (prototyp)</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+    <style>
+        /* Minimalny CSS Leaflet jako zapas, gdyby arkusz z CDN się nie załadował */
+        .leaflet-pane,.leaflet-tile,.leaflet-marker-icon,.leaflet-marker-shadow,.leaflet-tile-container,.leaflet-zoom-box,.leaflet-image-layer,.leaflet-layer{position:absolute;left:0;top:0}
+        .leaflet-container{overflow:hidden;-webkit-tap-highlight-color:transparent;background:#dfe7ea;outline-offset:1px}
+        .leaflet-container .leaflet-overlay-pane svg,.leaflet-container .leaflet-marker-pane img,.leaflet-container .leaflet-tile-pane img{max-width:none!important;max-height:none!important}
+        .leaflet-tile,.leaflet-marker-icon,.leaflet-marker-shadow{user-select:none;-webkit-user-drag:none}
+        .leaflet-tile{visibility:hidden}.leaflet-tile-loaded{visibility:inherit}
+        .leaflet-zoom-animated{transform-origin:0 0}
+        .leaflet-zoom-anim .leaflet-zoom-animated{transition:transform .25s cubic-bezier(0,0,.25,1)}
+        .leaflet-zoom-anim .leaflet-tile,.leaflet-pan-anim .leaflet-tile{transition:none}
+        .leaflet-pane{z-index:400}.leaflet-tile-pane{z-index:200}.leaflet-overlay-pane{z-index:400}.leaflet-shadow-pane{z-index:500}.leaflet-marker-pane{z-index:600}.leaflet-tooltip-pane{z-index:650}.leaflet-popup-pane{z-index:700}
+        .leaflet-map-pane canvas,.leaflet-map-pane svg{position:absolute;left:0;top:0}
+        .leaflet-control{position:relative;z-index:800;pointer-events:auto;float:left;clear:both}
+        .leaflet-top,.leaflet-bottom{position:absolute;z-index:1000;pointer-events:none}
+        .leaflet-top{top:0}.leaflet-right{right:0}.leaflet-bottom{bottom:0}.leaflet-left{left:0}
+        .leaflet-right .leaflet-control{float:right}
+        .leaflet-top .leaflet-control{margin-top:10px}.leaflet-bottom .leaflet-control{margin-bottom:10px}
+        .leaflet-left .leaflet-control{margin-left:10px}.leaflet-right .leaflet-control{margin-right:10px}
+        .leaflet-bar{box-shadow:0 1px 5px rgba(0,0,0,.4);border-radius:4px}
+        .leaflet-bar a{background:#fff;border-bottom:1px solid #ccc;width:30px;height:30px;line-height:30px;display:block;text-align:center;text-decoration:none;color:#000;font:bold 18px 'Lucida Console',Monaco,monospace}
+        .leaflet-bar a:first-child{border-radius:4px 4px 0 0}.leaflet-bar a:last-child{border-radius:0 0 4px 4px;border-bottom:0}
+        .leaflet-control-attribution{background:rgba(255,255,255,.8);padding:0 5px;font-size:11px;color:#333}
+        .leaflet-popup{position:absolute;text-align:center;margin-bottom:20px}
+        .leaflet-popup-content-wrapper{padding:1px;text-align:left;border-radius:10px;background:#fff;box-shadow:0 3px 14px rgba(0,0,0,.4)}
+        .leaflet-popup-content{margin:12px 16px;line-height:1.4}
+        .leaflet-popup-tip-container{width:40px;height:20px;position:absolute;left:50%;margin-left:-20px;overflow:hidden;pointer-events:none}
+        .leaflet-popup-tip{width:17px;height:17px;padding:1px;margin:-10px auto 0;transform:rotate(45deg);background:#fff}
+        .leaflet-container a.leaflet-popup-close-button{position:absolute;top:0;right:0;padding:4px 8px 0 0;text-align:right;width:24px;height:24px;font:16px/24px Tahoma,Verdana,sans-serif;color:#757575;text-decoration:none}
+        .leaflet-fade-anim .leaflet-popup{opacity:1;transition:opacity .2s linear}
+        .leaflet-tooltip{position:absolute;padding:5px 8px;background:#fff;border:1px solid #fff;border-radius:4px;color:#222;white-space:nowrap;user-select:none;pointer-events:none;box-shadow:0 1px 3px rgba(0,0,0,.4)}
+        .leaflet-interactive{cursor:pointer}
+        .leaflet-grab{cursor:grab}.leaflet-dragging .leaflet-grab{cursor:grabbing}
+    </style>
+    <style>
+        :root { --ink:#1f2a2e; --muted:#5f6b70; --line:#d8dee0; --bg:#ffffff; --accent:#0f6b5c; }
+        @media (prefers-color-scheme: dark) {
+          :root { --ink:#e8eeef; --muted:#9aa7ab; --line:#33403f; --bg:#182022; --accent:#4cc2ac; }
+        }
+        * { box-sizing: border-box; }
+        [hidden] { display: none !important; }
+        html, body { height: 100%; margin: 0; }
+        body { font-family: system-ui, sans-serif; color: var(--ink); background: var(--bg); display: flex;
+               padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+        button { font: inherit; color: inherit; }
+        h4 { margin: 14px 0 4px; font-size: 14px; }
+        p { margin: 4px 0 8px; line-height: 1.45; }
+
+        /* panel */
+        #panel { width: 320px; flex: none; padding: 18px; overflow-y: auto; background: var(--bg);
+                 border-right: 1px solid var(--line); z-index: 1200; }
+        #panel h2 { margin: 0 0 2px; font-size: 20px; }
+        .count { color: var(--muted); margin: 0 0 16px; }
+        fieldset { border: 0; padding: 0; margin: 0 0 16px; }
+        legend { font-weight: 600; margin-bottom: 6px; padding: 0; }
+        input[type=number], select { width: 100%; padding: 9px; font: inherit; font-size: 16px; color: var(--ink);
+                 background: var(--bg); border: 1px solid var(--line); border-radius: 8px; }
+        label.chk { display: flex; gap: 8px; align-items: center; padding: 4px 0; }
+        details { margin-bottom: 16px; }
+        summary { cursor: pointer; font-weight: 600; margin-bottom: 8px; }
+        .subhead { color: var(--muted); font-size: 13px; margin: 8px 0 2px; }
+        .legend-row { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 8px; }
+        .legend-row span { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+        .note { color: var(--muted); font-size: 12px; margin: 6px 0 0; }
+        .footer { position: sticky; bottom: 0; display: flex; gap: 8px; padding: 10px 0 0; background: var(--bg); }
+        .footer button { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); cursor: pointer; }
+        #apply { display: none; background: var(--accent); color: #fff; border: 0; }
+
+        .item { display: flex; gap: 10px; align-items: center; width: 100%; text-align: left; padding: 10px 12px;
+                border: 0; background: transparent; cursor: pointer; }
+        .item:hover, .item:focus-visible { background: rgba(127,127,127,.15); }
+        .item small { display: block; color: var(--muted); }
+        .item.active { background: rgba(127,127,127,.22); }
+        #routes .item { border: 1px solid var(--line); border-radius: 8px; margin-bottom: 6px; }
+        .dot { width: 12px; height: 12px; border-radius: 50%; flex: none; display: inline-block; }
+
+        /* mapa + pasek */
+        #mapwrap { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+        #stage { position: relative; flex: 1; min-height: 0; }
+        #map { position: absolute; inset: 0; }
+
+        #infobar { display: flex; align-items: center; gap: 14px; padding: 6px 10px; border-bottom: 1px solid var(--line);
+                   background: var(--bg); overflow-x: auto; white-space: nowrap; font-size: 13px; z-index: 1100; }
+        #infobar select { width: auto; padding: 4px 6px; font-size: 13px; }
+        .ib-block { display: flex; align-items: center; gap: 6px; flex: none; }
+        #ibWeather { cursor: pointer; }
+        .wnow, .wchip { display: inline-flex; flex-direction: column; align-items: center; padding: 2px 8px; border-radius: 8px;
+                        background: rgba(127,127,127,.12); line-height: 1.15; margin-right: 4px; }
+        .wnow b { font-size: 15px; }
+        .wchip i { font-style: normal; }
+        .wnow small, .wchip small { color: var(--muted); font-size: 11px; }
+        #ibFlight { cursor: pointer; padding: 4px 10px; border-radius: 8px; background: rgba(127,127,127,.12); flex: none; }
+        #ibFlight small { color: var(--muted); }
+
+        #topbar { position: absolute; z-index: 1000; top: 10px; left: 10px; right: 10px; max-width: 380px; display: flex; gap: 8px; }
+        #toggle { display: none; }
+        .iconbtn { padding: 0 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg);
+                   box-shadow: 0 1px 6px rgba(0,0,0,.25); font-size: 18px; cursor: pointer; }
+        #searchbox { position: relative; flex: 1; }
+        #q { width: 100%; padding: 11px 14px; font: inherit; font-size: 16px; color: var(--ink); background: var(--bg);
+             border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 1px 6px rgba(0,0,0,.25); }
+        #results { position: absolute; top: calc(100% + 6px); left: 0; right: 0; max-height: 55vh; overflow: auto;
+                   background: var(--bg); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 4px 16px rgba(0,0,0,.3); }
+        #results .empty { padding: 12px; color: var(--muted); }
+
+        /* karta trasy */
+        #routesheet { position: absolute; z-index: 1000; background: var(--bg); border: 1px solid var(--line); border-radius: 12px;
+                      box-shadow: 0 4px 16px rgba(0,0,0,.3); overflow-y: auto; padding: 14px; }
+        @media (min-width: 701px) { #routesheet { top: 10px; right: 10px; bottom: 30px; width: clamp(300px, 38%, 420px); } }
+        .rs-head { display: flex; align-items: center; gap: 8px; }
+        .rs-head b { flex: 1; font-size: 17px; }
+        .rs-head button { border: 0; background: transparent; font-size: 18px; cursor: pointer; padding: 4px 8px; }
+        .rs-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+        .rs-chips span, .tag { padding: 3px 8px; border-radius: 999px; background: rgba(127,127,127,.15); font-size: 12px; }
+        .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0; }
+        .day { margin: 6px 0 10px; }
+        ol.stops { list-style: none; margin: 4px 0; padding: 0; }
+        ol.stops li button { display: flex; gap: 10px; align-items: center; width: 100%; text-align: left; padding: 5px 0;
+                             border: 0; background: transparent; cursor: pointer; }
+        ol.stops small { display: block; color: var(--muted); }
+        .num { width: 24px; height: 24px; border-radius: 50%; flex: none; display: flex; align-items: center; justify-content: center;
+               color: #fff; font-weight: 700; font-size: 13px; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
+        .mini { width: 100%; border-collapse: collapse; font-size: 14px; }
+        .mini td { padding: 5px 4px; border-bottom: 1px solid var(--line); }
+        .mini td:last-child { text-align: right; white-space: nowrap; }
+        #routesheet ul { margin: 4px 0; padding-left: 18px; }
+        #routesheet li { margin: 3px 0; }
+        .months { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0; }
+        .mchip { display: flex; flex-direction: column; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line);
+                 background: rgba(46,158,91,.12); font-size: 13px; }
+        .mchip b { font-size: 14px; }
+
+        .pin { width: 28px; height: 28px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.5);
+               display: flex; align-items: center; justify-content: center; font-size: 14px; }
+        .pin.numbered { color: #fff; font-weight: 700; font-size: 13px; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
+        .pin.start { background: #1f2a2e; font-size: 15px; }
+
+        .popup { color: #1f2a2e; min-width: 200px; }
+        .popup h3 { margin: 0 0 2px; font-size: 16px; }
+        .popup .meta { color: #5f6b70; font-size: 12px; margin-bottom: 6px; }
+        .popup p { margin: 8px 0; }
+        .popup .routes button { display: block; margin-top: 4px; padding: 5px 8px; border: 1px solid #c9d2d4; border-radius: 6px;
+                                background: #f3f6f6; color: #1f2a2e; cursor: pointer; text-align: left; }
+
+        /* okno "Kiedy jechać" */
+        #when { position: fixed; inset: 0; z-index: 3000; background: rgba(0,0,0,.5); display: flex; align-items: flex-start;
+                justify-content: center; overflow: auto; padding: calc(12px + env(safe-area-inset-top, 0px)) 12px 12px; }
+        #when .sheet { background: var(--bg); color: var(--ink); width: 100%; max-width: 860px; border-radius: 14px; padding: 16px;
+                       box-shadow: 0 8px 30px rgba(0,0,0,.4); }
+        .sheet-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .sheet-head b { font-size: 18px; }
+        .sheet-head button { border: 0; background: transparent; font-size: 20px; cursor: pointer; padding: 4px 8px; }
+        .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+        .sheet label { display: block; font-size: 13px; color: var(--muted); }
+        .sheet label select, .sheet label input { margin-top: 4px; }
+        .sheet input[type=date], .sheet input[type=password] { width: 100%; padding: 9px; font: inherit; font-size: 16px; color: var(--ink);
+                   background: var(--bg); border: 1px solid var(--line); border-radius: 8px; }
+        .sheet input[type=range] { width: 100%; }
+        .sheet .btn { padding: 9px 14px; border-radius: 8px; border: 0; background: var(--accent); color: #fff; cursor: pointer; }
+        #wPeriod, .box { padding: 10px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 12px; }
+        .tblwrap { overflow-x: auto; }
+        #wTable { width: 100%; border-collapse: collapse; font-size: 14px; }
+        #wTable th, #wTable td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+        #wTable tr.best { background: rgba(46,158,91,.18); }
+        .pcell input { width: 84px; padding: 5px; font-size: 14px; }
+        .pcell a { margin-left: 6px; text-decoration: none; }
+        .src { font-size: 10px; margin-left: 4px; }
+        .src-api { color: #2e9e5b; } .src-manual { color: #2a86c9; } .src-sample { color: #999; }
+
+        @media (max-width: 700px) {
+          #panel { position: fixed; inset: 0; width: 100%; transform: translateX(-100%); transition: transform .2s;
+                   padding-top: calc(18px + env(safe-area-inset-top, 0px)); }
+          #panel.open { transform: none; }
+          #toggle { display: block; }
+          #topbar { max-width: none; }
+          #apply { display: block; }
+          #routesheet { left: 10px; right: 10px; bottom: 30px; max-height: 55%; }
+        }
+    </style>
+</head>
+<body>
+
+<aside id="panel"></aside>
+<div id="mapwrap">
+    <div id="infobar">
+        <div class="ib-block"><span>📍</span><select id="ibRegion" aria-label="Region pogody"></select></div>
+        <div class="ib-block" id="ibWeather" title="Kliknij, aby zobaczyć, kiedy jechać"></div>
+        <div class="ib-block"><select id="ibOrigin" aria-label="Lotnisko wylotu"></select></div>
+        <div id="ibFlight" title="Kliknij, aby porównać miesiące i podłączyć API cen"></div>
+    </div>
+    <div id="stage">
+        <div id="map"></div>
+        <div id="topbar">
+            <button id="toggle" class="iconbtn" aria-label="Filtry i trasy">☰</button>
+            <div id="searchbox">
+                <input id="q" type="search" placeholder="Szukaj miejsca lub trasy…" autocomplete="off" aria-label="Szukaj miejsca lub trasy">
+                <div id="results" hidden></div>
+            </div>
+            <button id="whenBtn" class="iconbtn" aria-label="Kiedy jechać">📅</button>
+        </div>
+        <div id="routesheet" hidden></div>
+    </div>
+</div>
+<div id="when" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+    /* ============ CONFIG ============ */
+    const MAP_CENTER = [41.15, 20.05];
+    const MAP_ZOOM = 8;
+    const ALL_TO_PLN = 0.043;          // orientacyjny kurs: 1 lek albański ≈ 0,043 zł
+    const FOOD_PER_DAY_PLN = 80;       // szacunek: jedzenie na osobę na dzień
+    const LODGING_PER_NIGHT_PLN = 100; // szacunek: nocleg na osobę (pokój dwuosobowy podzielony na dwie osoby)
+    /* Baza API cen lotów (Travelpayouts / Aviasales). Jeśli przeglądarka zablokuje zapytanie (CORS),
+       wpisz tu adres własnego proxy (np. Cloudflare Worker), który przekazuje ruch do api.travelpayouts.com. */
+    const FLIGHTS_API_BASE = "https://api.travelpayouts.com";
+
+    const CATEGORIES = {
+      zabytek: { label: "Zabytki", icon: "🏰" },
+      natura:  { label: "Natura",  icon: "🌲" },
+      miasto:  { label: "Miasta",  icon: "🏙️" },
+      muzeum:  { label: "Muzea",   icon: "🖼️" },
+      plaza:   { label: "Plaże",   icon: "🏖️" },
+    };
+    /* lat/lon = punkt referencyjny pogody dla regionu, ideal = temperatura max uznawana za idealną */
+    const REGIONS = {
+      tirana:   { label: "Tirana i okolice",         lat: 41.33, lon: 19.82, ideal: 27 },
+      polnoc:   { label: "Północ (Alpy Albańskie)",  lat: 42.40, lon: 19.77, ideal: 24 },
+      centrum:  { label: "Środkowa Albania (Berat)", lat: 40.70, lon: 19.95, ideal: 28 },
+      riwiera:  { label: "Riwiera Albańska",         lat: 40.16, lon: 19.64, ideal: 29 },
+      poludnie: { label: "Południe (Sarandë)",       lat: 39.87, lon: 20.00, ideal: 29 },
+      wschod:   { label: "Wschód (Pogradec, Korçë)", lat: 40.62, lon: 20.78, ideal: 25 },
+    };
+    /* Punkty startowe tras: lotnisko lub port, do którego dolatujesz/dopływasz. k = mnożnik przykładowych cen lotów */
+    const STARTS = {
+      TIA: { iata: "TIA", icon: "✈️", short: "Tirana (TIA)",   k: 1.00, label: "Lotnisko Tirana Rinas (TIA)", lat: 41.4147, lon: 19.7206 },
+      CFU: { iata: "CFU", icon: "⛴️", short: "Korfu (CFU)",    k: 1.15, label: "Lotnisko Korfu (CFU) i prom do Sarandy", lat: 39.6019, lon: 19.9117 },
+      TGD: { iata: "TGD", icon: "✈️", short: "Podgorica (TGD)", k: 1.00, label: "Lotnisko Podgorica (TGD), Czarnogóra", lat: 42.3594, lon: 19.2519 },
+      OHD: { iata: "OHD", icon: "✈️", short: "Ochryda (OHD)",  k: 1.10, label: "Lotnisko Ochryda (OHD), Macedonia Północna", lat: 41.1800, lon: 20.7423 },
+    };
+    const AIRPORTS = {   // lotniska wylotu z Polski; k = mnożnik przykładowych cen
+      WAW: { label: "Warszawa (WAW)", k: 1.00 }, KRK: { label: "Kraków (KRK)", k: 0.95 },
+      GDN: { label: "Gdańsk (GDN)", k: 1.05 },    KTW: { label: "Katowice (KTW)", k: 0.95 },
+      WRO: { label: "Wrocław (WRO)", k: 1.00 },   POZ: { label: "Poznań (POZ)", k: 1.05 },
+    };
+    /* PRZYKŁADOWE ceny lotu tam i z powrotem w zł (sty..gru) - używane, dopóki API nie zwróci danych */
+    const SAMPLE_FLIGHTS = [450, 430, 480, 560, 620, 780, 1050, 1100, 780, 560, 470, 640];
+
+    /* Kolor = cena w zł. Przedziały sprawdzane po kolei: pierwszy, w którym cena <= max. */
+    const PLACE_BANDS = [
+      { max: 0,        color: "#2e9e5b", label: "0 zł" },
+      { max: 20,       color: "#e2b100", label: "1–20 zł" },
+      { max: 50,       color: "#f07f1e", label: "21–50 zł" },
+      { max: Infinity, color: "#d9534f", label: "ponad 50 zł" },
+    ];
+    const ROUTE_BANDS = [   // koszt całej trasy na miejscu (bez lotu)
+      { max: 400,      color: "#2e9e5b", label: "do 400 zł" },
+      { max: 800,      color: "#f07f1e", label: "401–800 zł" },
+      { max: Infinity, color: "#d9534f", label: "ponad 800 zł" },
+    ];
+    const TIME_OPTIONS = [
+      { label: "Dowolny", max: Infinity },
+      { label: "Do 1 h", max: 60 },
+      { label: "Do 3 h", max: 180 },
+      { label: "Do 5 h", max: 300 },
+      { label: "Do 8 h (cały dzień)", max: 480 },
+      { label: "Do 12 h", max: 720 },
+      { label: "Do 24 h (kilka dni)", max: 1440 },
+    ];
+
+    /* ============ DANE (docelowo data/places.geojson) ============ */
+    /* price_all = orientacyjny koszt wejścia na osobę w lekach, duration_min = szacowany czas zwiedzania.
+       Współrzędne części miejsc są przybliżone - sprawdź je przed publikacją. */
+    function place(id, name, description, category, region, duration_min, price_all, price_note, lon, lat) {
+      return { type: "Feature", geometry: { type: "Point", coordinates: [lon, lat] },
+               properties: { id, name, description, category, region, duration_min, price_all, price_note } };
+    }
+    const PLACES = { type: "FeatureCollection", features: [
+      // Tirana i okolice
+      place("skanderbeg", "Plac Skanderbega", "Główny plac Tirany: pomnik bohatera narodowego, meczet Et'hem Beja i wieża zegarowa.", "miasto", "tirana", 60, 0, "", 19.8189, 41.3275),
+      place("bunkart2", "Bunk'Art 2", "Schron z czasów Envera Hoxhy zamieniony w muzeum policji politycznej.", "muzeum", "tirana", 90, 600, "", 19.8224, 41.3289),
+      place("piramida", "Piramida i Blloku", "Dawne mauzoleum Hoxhy i dzielnica kawiarni, kiedyś zamknięta dla zwykłych ludzi.", "zabytek", "tirana", 60, 0, "", 19.8258, 41.3213),
+      place("dajti", "Góra Dajti (kolejka Dajti Ekspres)", "Kolejką linową nad Tiranę, widoki i szlaki spacerowe.", "natura", "tirana", 180, 2000, "kolejka tam i z powrotem", 19.8895, 41.3421),
+      place("kruje", "Krujë: zamek i muzeum Skanderbega", "Twierdza bohatera narodowego i tradycyjny bazar.", "zabytek", "tirana", 120, 400, "", 19.7929, 41.5089),
+      // Środkowa Albania
+      place("durres", "Amfiteatr w Durrës", "Jeden z największych rzymskich amfiteatrów na Bałkanach, obok bizantyjska kaplica z mozaiką.", "zabytek", "centrum", 90, 700, "", 19.4467, 41.3140),
+      place("apollonia", "Apollonia", "Antyczne miasto greckie na wzgórzu, klasztor i muzeum.", "zabytek", "centrum", 120, 700, "", 19.4747, 40.7186),
+      place("berat", "Berat", "„Miasto tysiąca okien”, UNESCO: zamek z żywą osadą i osmańskie domy.", "zabytek", "centrum", 240, 0, "zamek wolny, muzea ok. 200 lek", 19.9500, 40.7058),
+      // Riwiera
+      place("llogara", "Przełęcz Llogara", "Widokowa droga przez park narodowy nad Morzem Jońskim.", "natura", "riwiera", 60, 0, "", 19.5867, 40.2003),
+      place("dhermi", "Dhermi i Jale", "Plaże z turkusową wodą u stóp gór.", "plaza", "riwiera", 180, 0, "leżak opcjonalnie", 19.6403, 40.1567),
+      place("himara", "Himarë", "Miasteczko z długą plażą Livadhi i widokiem na zatokę.", "plaza", "riwiera", 180, 0, "", 19.7444, 40.1006),
+      place("porto-palermo", "Zamek Porto Palermo", "Twierdza Ali Paszy na półwyspie nad zatoką.", "zabytek", "riwiera", 60, 300, "", 19.7683, 40.0603),
+      // Południe
+      place("saranda", "Promenada w Sarandzie", "Nadmorski deptak z widokiem na Korfu.", "miasto", "poludnie", 90, 0, "", 20.0050, 39.8753),
+      place("ksamil", "Ksamil", "Malutkie wyspy i turkusowe zatoczki, jedne z najładniejszych plaż Albanii.", "plaza", "poludnie", 240, 0, "leżak ok. 1500–3000 lek", 20.0006, 39.7826),
+      place("butrint", "Butrint", "Park narodowy z ruinami antycznego miasta, UNESCO.", "zabytek", "poludnie", 180, 1000, "", 20.0208, 39.7458),
+      place("blue-eye", "Syri i Kaltër (Błękitne Oko)", "Źródło o intensywnie niebieskiej wodzie, ok. 25 km od Sarandy.", "natura", "poludnie", 90, 100, "opłata przy wejściu", 20.1928, 39.9231),
+      place("gjirokastra", "Gjirokastra", "Kamienne miasto UNESCO z twierdzą i muzeum broni.", "zabytek", "poludnie", 180, 400, "cytadela", 20.1400, 40.0758),
+      // Północ
+      place("shkoder", "Szkodra: twierdza Rozafa", "Twierdza nad jeziorem Szkoderskim z legendą o zamurowanej kobiecie.", "zabytek", "polnoc", 120, 400, "", 19.4930, 42.0481),
+      place("koman", "Jezioro Koman (prom)", "Rejs promem między fiordami, jedna z najpiękniejszych tras na Bałkanach.", "natura", "polnoc", 300, 2000, "prom w jedną stronę", 19.8283, 42.1074),
+      place("theth", "Theth", "Górska wieś w Alpach Albańskich, wodospad i Błękitne Oko Theth.", "natura", "polnoc", 480, 0, "", 19.7736, 42.3958),
+      place("valbona", "Dolina Valbona", "Park narodowy w Alpach Albańskich, szlaki i rzeka.", "natura", "polnoc", 480, 0, "", 19.8700, 42.4500),
+      // Wschód
+      place("pogradec", "Pogradec", "Promenada nad jeziorem Ochrydzkim, ryby z jeziora i spokojna plaża.", "miasto", "wschod", 120, 0, "", 20.6528, 40.9025),
+      place("drilon", "Źródła Drilon", "Zielony park ze źródłami zasilającymi jezioro Ochrydzkie, łódki wśród drzew.", "natura", "wschod", 90, 200, "", 20.6227, 40.9209),
+      place("korce", "Korçë: bazar i muzeum sztuki średniowiecznej", "Stary bazar, kawiarnie i muzeum ikon w mieście serenad.", "miasto", "wschod", 180, 300, "muzeum", 20.7783, 40.6186),
+    ]};
+
+    /* Trasy. start = klucz w STARTS (skąd zaczynasz), transfer = dojazd ze startu do pierwszego punktu,
+       days = plan po dniach (kolejność id = kolejność zwiedzania), local = szacunek transportu na trasie (zł). */
+    const ROUTES = [
+      { id: "tirana-dzien", name: "Tirana w jeden dzień", region: "tirana", start: "TIA", dayCount: 1, local: 40,
+        tags: ["miasto", "historia", "kawiarnie"],
+        description: "Stolica Albanii w pigułce: od komunistycznego bunkra, przez plac Skanderbega, po dawną dzielnicę elit Blloku i widoki z góry Dajti. To dobry pomysł na pierwszy lub ostatni dzień, gdy masz lot rano lub wieczorem. Tirana jest kolorowa, głośna i tania, więc po całym dniu na nogach łatwo tu dobrze zjeść.",
+        forWho: "Dla ciekawych historii XX wieku i miejskiej, kawiarnianej atmosfery. Mało chodzenia po górach, nie potrzebujesz samochodu.",
+        transfer: { min: 45, cost: 17, how: "Autobus z lotniska do centrum (ok. 30–40 min, ok. 400 lek) albo taksówka za ok. 20–25 €. Sprawdź aktualne kursy przed wylotem." },
+        days: [{ title: "Dzień 1", note: "Rano bunkier, później centrum i Blloku, na koniec kolejka na Dajti. Sprawdź godziny pracy kolejki.", ids: ["bunkart2", "skanderbeg", "piramida", "dajti"] }],
+        seasonNote: "Najprzyjemniej wiosną i jesienią. Latem bywa bardzo gorąco (30 °C i więcej).",
+        tips: ["Kolejka na Dajti bywa nieczynna przy silnym wietrze lub w dni serwisowe.", "Centrum Tirany jest zwarte, większość punktów zrobisz pieszo.", "Weź gotówkę w lekach na drobne zakupy."] },
+
+      { id: "kruje-tirana-durres", name: "Krujë, Tirana i Durrës", region: "tirana", start: "TIA", dayCount: 2, local: 60,
+        tags: ["historia", "morze", "weekend"],
+        description: "Trzy oblicza Albanii w dwa dni: górska twierdza bohatera narodowego Skanderbega, stolica i rzymski amfiteatr nad Adriatykiem. Krujë leży tuż przy lotnisku, więc dobrze zacząć tu zaraz po przylocie, a Durrës zostawić na koniec i połączyć z odpoczynkiem nad morzem.",
+        forWho: "Na krótki wyjazd albo jako początek dłuższej podróży. Dla lubiących historię, którzy nie chcą spędzać dużo czasu w aucie.",
+        transfer: { min: 40, cost: 50, how: "Z lotniska do Krujë taksówką (ok. 10–15 €) albo autobusem przez Tiranę. Krujë jest ok. 20–30 min od lotniska." },
+        days: [
+          { title: "Dzień 1", note: "Krujë rano, potem Tirana. Nocleg w Tiranie.", ids: ["kruje", "skanderbeg"] },
+          { title: "Dzień 2", note: "Z Tirany do Durrës jedzie autobus lub furgon (ok. 1 h). Po amfiteatrze czas na plażę.", ids: ["durres"] },
+        ],
+        seasonNote: "Cały rok da się zwiedzać, na plażę w Durrës najlepiej od czerwca do września.",
+        tips: ["Krujë jest najspokojniejsze rano, przed przyjazdem wycieczek.", "Do Durrës z Tirany jeździ regularny transport publiczny.", "W sezonie plaża w Durrës jest tłoczna, lepiej przyjść wcześnie."] },
+
+      { id: "miasta-unesco", name: "Apollonia, Berat i Gjirokastra", region: "centrum", start: "TIA", dayCount: 3, local: 150,
+        tags: ["UNESCO", "architektura", "fotografia"],
+        description: "Dwa miasta UNESCO i antyczna Apollonia. Berat to „miasto tysiąca okien”: białe osmańskie domy wspinają się po zboczu nad rzeką. Gjirokastra jest z kamienia, z twierdzą nad doliną i stromymi, brukowanymi uliczkami. To najlepsza trasa, jeśli lubisz architekturę, wąskie uliczki i lokalną kuchnię.",
+        forWho: "Dla miłośników architektury, historii i fotografii. Sporo chodzenia po stromych, śliskich uliczkach, więc wygodne buty to podstawa. Najwygodniej autem.",
+        transfer: { min: 150, cost: 100, how: "Z lotniska do Apollonii ok. 2–2,5 h. Wygodnie wynajętym autem lub transferem prywatnym. Komunikacją publiczną przez Tiranę i Fier, z przesiadkami." },
+        days: [
+          { title: "Dzień 1", note: "Rano Apollonia, potem przejazd do Beratu (ok. 1 h).", ids: ["apollonia"] },
+          { title: "Dzień 2", note: "Cały dzień w Beracie: zamek, stare miasto, wieczorem spacer nad rzeką.", ids: ["berat"] },
+          { title: "Dzień 3", note: "Przejazd do Gjirokastry (ok. 2,5–3 h) i zwiedzanie cytadeli.", ids: ["gjirokastra"] },
+        ],
+        seasonNote: "Wiosna i jesień są najprzyjemniejsze. Latem w kamiennych miastach robi się bardzo gorąco.",
+        tips: ["W Beracie zaparkuj na dole i wejdź do zamku pieszo lub taksówką, uliczki są strome.", "W Gjirokastrze kostka bywa śliska po deszczu.", "Noclegi w domach gościnnych w starych częściach miast są klimatyczne i zwykle tanie."] },
+
+      { id: "poludnie-korfu", name: "Południe: Sarandë, Butrint i Ksamil", region: "poludnie", start: "CFU", dayCount: 2, local: 80,
+        tags: ["plaża", "antyk", "krótki wyjazd"],
+        description: "Klasyczne południe: nadmorska Sarandë, Błękitne Oko, antyczne ruiny Butrint i turkusowe zatoczki Ksamil. Dojazd promem z Korfu to wygodna alternatywa dla długiej podróży z Tirany: z wyspy jesteś w Albanii w niecałą godzinę. Butrint zwiedzaj rano, plażuj po południu.",
+        forWho: "Dla tych, którzy chcą połączyć plażę z historią w jednym miejscu, bez wielogodzinnych przejazdów.",
+        transfer: { min: 180, cost: 150, how: "Z lotniska w Korfu taksówką do portu (ok. 15–20 min), potem prom lub katamaran do Sarandy (od ok. 30 min do 1,5 h). Zabierz dokument i sprawdź rozkład rejsów oraz ceny, bo zmieniają się z sezonem." },
+        days: [
+          { title: "Dzień 1", note: "Po przypłynięciu Sarandë i wypad do Błękitnego Oka (ok. 25 km).", ids: ["saranda", "blue-eye"] },
+          { title: "Dzień 2", note: "Rano Butrint, po południu plażowanie w Ksamil.", ids: ["butrint", "ksamil"] },
+        ],
+        seasonNote: "Najlepiej czerwiec–wrzesień. W lipcu i sierpniu jest tłoczno i drożej, maj i wrzesień to dobry kompromis.",
+        tips: ["Butrint jest najprzyjemniejszy rano.", "W Ksamil w sezonie przyjdź na plażę wcześnie, bo darmowe miejsca szybko znikają.", "Do Błękitnego Oka dojedziesz taksówką lub minibusem z Sarandy."] },
+
+      { id: "riwiera", name: "Riwiera Albańska: od Llogary do Ksamil", region: "riwiera", start: "TIA", dayCount: 4, local: 300,
+        tags: ["auto", "plaże", "widoki"],
+        description: "Jońskie wybrzeże Albanii w drodze z północy na południe: widokowa przełęcz Llogara, żwirowe plaże Dhermi i Himarë, twierdza Porto Palermo, a na końcu Sarandë z Ksamil. To trasa dla tych, którzy chcą połączyć jazdę widokową z plażowaniem, bez presji zwiedzania zabytków.",
+        forWho: "Dla lubiących jazdę autem, plażę i widoki. Samochód jest praktycznie niezbędny, bo komunikacja publiczna na tym odcinku jest rzadka.",
+        transfer: { min: 240, cost: 120, how: "Z lotniska autem ok. 3,5–4 h przez Fier i Vlorë (wypożyczenie na lotnisku). Autobusy jadą do Vlorë, dalej trzeba się przesiadać." },
+        days: [
+          { title: "Dzień 1", note: "Przełęcz Llogara i pierwsza plaża w Dhermi. Nocleg w okolicy.", ids: ["llogara", "dhermi"] },
+          { title: "Dzień 2", note: "Himarë i po drodze zamek Porto Palermo.", ids: ["himara", "porto-palermo"] },
+          { title: "Dzień 3", note: "Przejazd do Sarandy, spacer promenadą.", ids: ["saranda"] },
+          { title: "Dzień 4", note: "Ksamil i odpoczynek przed powrotem.", ids: ["ksamil"] },
+        ],
+        seasonNote: "Czerwiec–wrzesień. W maju i październiku pogoda bywa piękna, ale kapryśna.",
+        tips: ["Droga przez Llogarę jest kręta, wyjeżdżaj rano.", "Noclegi w lipcu i sierpniu rezerwuj z wyprzedzeniem, ceny mocno rosną.", "Sprawdź paliwo i warunki drogowe przed wyjazdem w góry."] },
+
+      { id: "polnoc-theth", name: "Alpy Albańskie: Szkodra i Theth", region: "polnoc", start: "TGD", dayCount: 3, local: 200,
+        tags: ["góry", "trekking", "cisza"],
+        description: "Klimat gór, nie plaży. Szkodra ze średniowieczną twierdzą Rozafa nad jeziorem to przystanek na aklimatyzację, a potem droga w Alpy Albańskie do Theth: kamienne domy, wodospady i szlaki, z których najsłynniejszy prowadzi do Valbony. To najpiękniejsza, ale też najbardziej wymagająca trasa.",
+        forWho: "Dla aktywnych piechurów i fanów gór. Wymaga sprawności i dobrej pogody, a kierowca powinien czuć się pewnie na wąskich, krętych drogach.",
+        transfer: { min: 100, cost: 60, how: "Z lotniska w Podgoricy autobusem lub taksówką do Szkodry (ok. 1–1,5 h z przekroczeniem granicy). Taksówka kosztuje ok. 30–40 €, autobus jest tańszy." },
+        days: [
+          { title: "Dzień 1", note: "Twierdza Rozafa i wieczór nad jeziorem. Nocleg w Szkodrze.", ids: ["shkoder"] },
+          { title: "Dzień 2–3", note: "Przejazd do Theth (ok. 3 h). Spacery do wodospadu i, jeśli masz siły, dłuższy szlak.", ids: ["theth"] },
+        ],
+        seasonNote: "Czerwiec–wrzesień. Poza sezonem drogi i szlaki bywają zamknięte przez śnieg.",
+        tips: ["Droga do Theth jest wąska i miejscami stroma, w deszczu bywa trudna.", "Nocleg w Theth rezerwuj z wyprzedzeniem w lipcu i sierpniu.", "Weź ubrania na zmianę pogody, w górach zmienia się szybko."] },
+
+      { id: "polnoc-koman", name: "Prom Koman i dolina Valbona", region: "polnoc", start: "TIA", dayCount: 3, local: 250,
+        tags: ["prom", "góry", "widoki"],
+        description: "Połączenie Szkodry, rejsu promem po jeziorze Koman i doliny Valbona. Prom płynie między stromymi ścianami wąwozu i jest jedną z najsłynniejszych atrakcji Albanii, a w Valbonie odpoczniesz w zieleni albo wybierzesz się na szlak.",
+        forWho: "Podobne do Theth, ale mniej fizyczne. Dla lubiących widoki z pokładu i spokojny trekking.",
+        transfer: { min: 150, cost: 25, how: "Autobus z Tirany do Szkodry (ok. 2 h, ok. 500–700 lek). Sprawdź aktualne odjazdy." },
+        days: [
+          { title: "Dzień 1", note: "Twierdza Rozafa. Nocleg w Szkodrze.", ids: ["shkoder"] },
+          { title: "Dzień 2", note: "Wczesny przejazd do Koman i rejs promem.", ids: ["koman"] },
+          { title: "Dzień 3", note: "Dolina Valbona: spacery, szlak, odpoczynek.", ids: ["valbona"] },
+        ],
+        seasonNote: "Prom i schroniska działają głównie od maja/czerwca do września.",
+        tips: ["Prom pływa według rozkładu, który zmienia się co roku. Sprawdź go i zarezerwuj miejsce.", "Zabierz gotówkę w lekach, w górach karty nie zawsze działają.", "Wieczorem w dolinie jest chłodno nawet latem."] },
+
+      { id: "ochryda-korce", name: "Jezioro Ochrydzkie i Korçë", region: "wschod", start: "OHD", dayCount: 2, local: 100,
+        tags: ["spokój", "jezioro", "miasto"],
+        description: "Spokojna, mniej turystyczna Albania: promenada Pogradec nad jeziorem Ochrydzkim, źródła Drilon i Korçë z bazarem, kawiarniami i muzeum ikon. Dobre połączenie relaksu nad wodą i miejskiego klimatu na wschodzie kraju.",
+        forWho: "Dla szukających spokoju i lokalnego życia zamiast tłumów na wybrzeżu. Dobre także poza szczytem sezonu.",
+        transfer: { min: 90, cost: 60, how: "Z lotniska w Ochrydzie taksówką przez przejście graniczne do Pogradec (ok. 1–1,5 h, ok. 30–40 €). W sezonie możliwe kolejki na granicy." },
+        days: [
+          { title: "Dzień 1", note: "Pogradec i źródła Drilon.", ids: ["pogradec", "drilon"] },
+          { title: "Dzień 2", note: "Przejazd do Korçë (ok. 45 min) i spacer po bazarze.", ids: ["korce"] },
+        ],
+        seasonNote: "Maj–październik. Latem wschód jest łagodniejszy niż wybrzeże.",
+        tips: ["Jeśli jedziesz wynajętym autem, sprawdź zasady przekraczania granicy i ubezpieczenie.", "Ryby z jeziora to lokalna specjalność.", "Korçë leży wysoko, wieczorami jest chłodniej niż nad morzem."] },
+
+      { id: "wielka-petla", name: "Wielka pętla Albanii (7 dni)", region: "poludnie", start: "TIA", dayCount: 7, local: 500,
+        tags: ["auto", "pierwszy raz", "tydzień"],
+        description: "Najpełniejszy przegląd kraju w tydzień: Tirana, miasta UNESCO, antyczne ruiny, plaże południa i droga przez Llogarę z powrotem na północ. Wymaga samochodu i przejazdów po 3–5 godzin dziennie, ale w zamian dostajesz Albanię w pigułce.",
+        forWho: "Jeśli jesteś w Albanii pierwszy raz i masz tydzień. Dla lubiących często zmieniać miejsca i jeździć autem.",
+        transfer: { min: 45, cost: 17, how: "Autobus z lotniska do centrum (ok. 30–40 min, ok. 400 lek) albo taksówka. Auto najlepiej odebrać dopiero na drugi dzień." },
+        days: [
+          { title: "Dzień 1", note: "Tirana, spacer po centrum.", ids: ["skanderbeg"] },
+          { title: "Dzień 2", note: "Przejazd do Beratu (ok. 2 h).", ids: ["berat"] },
+          { title: "Dzień 3", note: "Gjirokastra (ok. 2,5–3 h jazdy).", ids: ["gjirokastra"] },
+          { title: "Dzień 4", note: "Błękitne Oko i Butrint.", ids: ["blue-eye", "butrint"] },
+          { title: "Dzień 5", note: "Plaże Ksamil.", ids: ["ksamil"] },
+          { title: "Dzień 6", note: "Droga na północ wzdłuż wybrzeża: Himarë i Dhermi.", ids: ["himara", "dhermi"] },
+          { title: "Dzień 7", note: "Przełęcz Llogara i powrót w stronę Tirany.", ids: ["llogara"] },
+        ],
+        seasonNote: "Kwiecień–czerwiec i wrzesień–październik są idealne. W lipcu i sierpniu na południu jest bardzo gorąco i tłoczno.",
+        tips: ["Zaplanuj mniej punktów dziennie niż Ci się wydaje: drogi są kręte i wolniejsze niż wskazują mapy.", "Nocleg w Beracie i Gjirokastrze zarezerwuj wcześniej.", "Tankuj przed odcinkami górskimi."] },
+
+      { id: "plaze", name: "Plażowy relaks: Ksamil i Riwiera", region: "poludnie", start: "CFU", dayCount: 4, local: 200,
+        tags: ["plaża", "relaks", "prom"],
+        description: "Odpoczynek zamiast zwiedzania: cztery bazy plażowe z południa na północ, z krótkimi przejazdami i jednym zamkiem na trasie. Zaczynasz od Ksamil tuż po promie z Korfu, a potem jedziesz wzdłuż wybrzeża do Dhermi.",
+        forWho: "Dla lubiących leżenie na plaży i lekkie zwiedzanie. Dobrze mieć samochód lub skorzystać z transferów między miejscowościami.",
+        transfer: { min: 180, cost: 150, how: "Z lotniska w Korfu taksówką do portu (ok. 15–20 min), potem prom lub katamaran do Sarandy (od ok. 30 min do 1,5 h). Sprawdź rozkład i ceny w danym sezonie." },
+        days: [
+          { title: "Dzień 1", note: "Ksamil i wyspy koło brzegu.", ids: ["ksamil"] },
+          { title: "Dzień 2", note: "Sarandë i przejazd wzdłuż wybrzeża, zamek Porto Palermo.", ids: ["saranda", "porto-palermo"] },
+          { title: "Dzień 3", note: "Himarë i plaża Livadhi.", ids: ["himara"] },
+          { title: "Dzień 4", note: "Dhermi i Jale.", ids: ["dhermi"] },
+        ],
+        seasonNote: "Najlepiej czerwiec–wrzesień. Morze jest najcieplejsze pod koniec lata.",
+        tips: ["W szczycie sezonu rezerwuj noclegi z dużym wyprzedzeniem.", "Zabierz krem i nakrycie głowy, cienia na plażach jest mało.", "Woda jest bardzo czysta, weź maskę do snorklingu."] },
+
+      { id: "gjirokastra-dzien", name: "Dzień w Gjirokastrze z Korfu", region: "poludnie", start: "CFU", dayCount: 1, local: 100,
+        tags: ["jeden dzień", "UNESCO", "natura"],
+        description: "Wypad jednodniowy w głąb lądu: turkusowe źródło Błękitnego Oka i kamienne miasto z twierdzą nad doliną. Dobre, jeśli masz mało czasu albo chcesz połączyć pobyt na Korfu z jednym dniem w kontynentalnej Albanii.",
+        forWho: "Dla osób z ograniczonym czasem, które chcą zobaczyć coś więcej niż plażę. Wymaga wczesnego wyjazdu.",
+        transfer: { min: 180, cost: 150, how: "Z Korfu prom do Sarandy (od ok. 30 min do 1,5 h), potem taksówka, minibus lub wynajęty samochód. Zaplanuj powrót na ostatni prom." },
+        days: [{ title: "Dzień 1", note: "Wczesnym promem do Sarandy, Błękitne Oko rano, potem Gjirokastra i powrót.", ids: ["blue-eye", "gjirokastra"] }],
+        seasonNote: "Najlepiej maj–wrzesień, gdy kursują prom i dłuższe rozkłady. W lecie robi się bardzo gorąco.",
+        tips: ["Sprawdź godzinę ostatniego promu powrotnego.", "Do Gjirokastry zabierz wygodne buty.", "Dzień jest napięty, nie planuj więcej punktów."] },
+    ];
+
+    /* Uproszczony zarys kraju ([lon, lat]) - pokazuje się tylko, gdy kafelki mapy się nie ładują */
+    const COUNTRY_OUTLINE = [[19.37,41.85],[19.40,42.03],[19.35,42.15],[19.42,42.36],[19.62,42.58],[19.85,42.47],[20.07,42.55],
+      [20.35,42.10],[20.55,41.85],[20.52,41.52],[20.45,41.30],[20.60,41.05],[20.78,40.90],[21.05,40.65],[20.95,40.40],
+      [20.70,40.20],[20.45,39.99],[20.30,39.80],[20.15,39.65],[20.02,39.65],[20.0,39.87],[19.90,40.00],[19.78,40.10],
+      [19.58,40.20],[19.40,40.30],[19.45,40.45],[19.38,40.70],[19.42,41.00],[19.45,41.32],[19.40,41.50],[19.45,41.65],[19.59,41.81]];
+
+    /* ============ NARZĘDZIA ============ */
+    const $ = id => document.getElementById(id);
+    const norm = s => s.toLowerCase().replace(/ł/g, "l").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const band = (bands, price) => bands.find(b => price <= b.max);
+    const zl = n => `${Math.round(n)} zł`;
+    function fmtMin(m) { const h = Math.floor(m / 60), r = m % 60; return h ? (r ? `${h} h ${r} min` : `${h} h`) : `${r} min`; }
+    function plural(n, one, few, many) {
+      const a = n % 10, b = n % 100;
+      return n === 1 ? one : (a >= 2 && a <= 4 && !(b >= 12 && b <= 14)) ? few : many;
+    }
+    const toLatLng = f => { const [lon, lat] = f.geometry.coordinates; return [lat, lon]; };  // GeoJSON lon,lat -> Leaflet lat,lon
+    function lsGet(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } }
+    function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* brak miejsca lub tryb prywatny */ } }
+    const avg = a => a.length ? a.reduce((s, x) => s + x, 0) / a.length : null;
+    const todayStr = () => new Date().toISOString().slice(0, 10);
+    const addDays = (s, n) => new Date(Date.parse(s + "T00:00:00Z") + n * 864e5).toISOString().slice(0, 10);
+    const fmtDay = s => s.slice(8, 10) + "." + s.slice(5, 7);
+    const rnd = x => x == null ? "–" : Math.round(x);
+    const WEEKDAYS = ["nd", "pn", "wt", "śr", "cz", "pt", "sb"];
+    const MONTHS = ["styczeń","luty","marzec","kwiecień","maj","czerwiec","lipiec","sierpień","wrzesień","październik","listopad","grudzień"];
+    const MONTHS_EN = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+    function wmoIcon(c) {   // kody pogody WMO z Open-Meteo
+      if (c == null) return "⛅";
+      if (c === 0) return "☀️"; if (c <= 2) return "🌤️"; if (c === 3) return "☁️";
+      if (c === 45 || c === 48) return "🌫️"; if (c >= 51 && c <= 57) return "🌦️";
+      if (c >= 61 && c <= 67) return "🌧️"; if (c >= 71 && c <= 77) return "❄️";
+      if (c >= 80 && c <= 82) return "🌧️"; if (c >= 85 && c <= 86) return "❄️"; if (c >= 95) return "⛈️";
+      return "⛅";
+    }
+
+    /* ============ PRZETWORZENIE DANYCH ============ */
+    const P = {};   // id -> feature
+    PLACES.features.forEach(f => {
+      const p = f.properties;
+      p.price_pln = Math.round(p.price_all * ALL_TO_PLN);
+      p._hay = norm([p.name, p.description, CATEGORIES[p.category].label, REGIONS[p.region].label].join(" "));
+      P[p.id] = f;
+    });
+    ROUTES.forEach(r => {
+      r.stops = r.days.flatMap(d => d.ids);
+      r.places = r.stops.map(id => P[id]);
+      r.duration = r.places.reduce((s, f) => s + f.properties.duration_min, 0);
+      const entries = r.places.reduce((s, f) => s + f.properties.price_pln, 0);
+      const food = FOOD_PER_DAY_PLN * r.dayCount, lodging = LODGING_PER_NIGHT_PLN * (r.dayCount - 1);
+      r.cost = { entries, transfer: r.transfer.cost, local: r.local, food, lodging,
+                 total: entries + r.transfer.cost + r.local + food + lodging };
+      r.color = band(ROUTE_BANDS, r.cost.total).color;
+      r.latlngs = r.places.map(toLatLng);
+      r.hay = norm([r.name, r.description, r.tags.join(" "), STARTS[r.start].label].join(" "));
+    });
+    const routeById = id => ROUTES.find(r => r.id === id);
+
+    /* ============ STAN I FILTRY ============ */
+    const app = { region: "tirana", origin: lsGet("origin") || "WAW", dest: "TIA" };
+    const state = {
+      query: "", budget: null, maxTime: Infinity, dismissed: false, routeId: null,
+      categories: new Set(Object.keys(CATEGORIES)),
+      regions: new Set(Object.keys(REGIONS)),
+    };
+    if (!AIRPORTS[app.origin]) app.origin = "WAW";
+    const textOk = hay => norm(state.query).split(/\s+/).filter(Boolean).every(t => hay.includes(t));
+
+    function placeMatches(p) {
+      return state.categories.has(p.category) && state.regions.has(p.region)
+          && (state.budget == null || p.price_pln <= state.budget)     // miejsca: cena wejścia
+          && p.duration_min <= state.maxTime
+          && textOk(p._hay);
+    }
+    function routeMatches(r) {
+      return (state.budget == null || r.cost.total <= state.budget)    // trasy: koszt całej trasy na miejscu (bez lotu)
+          && r.duration <= state.maxTime
+          && r.places.some(f => state.categories.has(f.properties.category) && state.regions.has(f.properties.region))
+          && (textOk(r.hay) || r.places.some(f => textOk(f.properties._hay)));
+    }
+
+    /* ============ MAPA ============ */
+    const map = L.map("map", { zoomControl: false }).setView(MAP_CENTER, MAP_ZOOM);
+    L.control.zoom({ position: "bottomleft" }).addTo(map);
+    map.createPane("base").style.zIndex = 250;
+    let outlineShown = false;
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18, attribution: "© OpenStreetMap" })
+      .on("tileerror", () => {
+        if (outlineShown) return;
+        outlineShown = true;
+        L.polygon(COUNTRY_OUTLINE.map(([lon, lat]) => [lat, lon]),
+          { pane: "base", color: "#7a8f8a", weight: 2, fillColor: "#e9efe4", fillOpacity: 1, interactive: false }).addTo(map);
+      }).addTo(map);
+    const layer = L.layerGroup().addTo(map);
+    const markers = {};            // id -> marker aktualnie na mapie
+    let last = { places: [], routes: [] };
+
+    function addMarker(f, number) {
+      const p = f.properties, color = band(PLACE_BANDS, p.price_pln).color;
+      const icon = L.divIcon({ className: "", iconSize: [28, 28], iconAnchor: [14, 14], popupAnchor: [0, -14],
+        html: `<div class="pin${number ? " numbered" : ""}" style="background:${color}">${number || CATEGORIES[p.category].icon}</div>` });
+      markers[p.id] = L.marker(toLatLng(f), { icon }).bindPopup(popupHtml(p), { maxWidth: 280 }).addTo(layer);
+    }
+    function drawRoute(r, selected) {
+      const line = L.polyline(r.latlngs, { color: r.color, weight: selected ? 6 : 4, opacity: selected ? 0.95 : 0.75,
+        dashArray: selected ? null : "10 8", lineJoin: "round" })
+        .bindTooltip(`${r.name} · ${zl(r.cost.total)}`, { sticky: true }).addTo(layer);
+      if (!selected) line.on("click", () => selectRoute(r.id));
+    }
+    function drawStart(r) {
+      const s = STARTS[r.start];
+      const icon = L.divIcon({ className: "", iconSize: [28, 28], iconAnchor: [14, 14],
+        html: `<div class="pin start">${s.icon}</div>` });
+      L.marker([s.lat, s.lon], { icon }).bindTooltip(`Start: ${s.label}`).addTo(layer);
+      L.polyline([[s.lat, s.lon], r.latlngs[0]], { color: "#6b7a7f", weight: 3, dashArray: "2 8" }).addTo(layer);
+    }
+    function popupHtml(p) {
+      const inRoutes = ROUTES.filter(r => r.stops.includes(p.id));
+      return `<div class="popup">
+        <h3>${p.name}</h3>
+        <div class="meta">${CATEGORIES[p.category].label} · ${REGIONS[p.region].label}</div>
+        <div>${p.description}</div>
+        <p>⏱ ok. ${fmtMin(p.duration_min)} &nbsp; 💰 ${zl(p.price_pln)}${p.price_all ? " (" + p.price_all + " lek)" : ""}${p.price_note ? ", " + p.price_note : ""}</p>
+        ${inRoutes.length ? `<div class="routes">Trasy z tym miejscem:${inRoutes.map(r => `<button data-route="${r.id}">🧭 ${r.name} · ${zl(r.cost.total)}</button>`).join("")}</div>` : ""}
+      </div>`;
+    }
+    map.on("popupopen", e => {
+      e.popup.getElement().querySelectorAll("[data-route]").forEach(b =>
+        b.onclick = () => { map.closePopup(); selectRoute(b.dataset.route); });
+    });
+    map.on("click", () => { state.dismissed = true; $("results").hidden = true; });
+
+    /* ============ RENDER ============ */
+    function render() {
+      layer.clearLayers();
+      Object.keys(markers).forEach(k => delete markers[k]);
+      const places = PLACES.features.filter(f => placeMatches(f.properties));
+      const routes = ROUTES.filter(routeMatches);
+      last = { places, routes };
+      const sel = routeById(state.routeId);
+
+      if (sel) {
+        drawStart(sel);
+        drawRoute(sel, true);
+        sel.places.forEach((f, i) => addMarker(f, i + 1));
+      } else {
+        routes.forEach(r => drawRoute(r, false));
+        places.forEach(f => addMarker(f, null));
+      }
+      renderRouteList(routes);
+      renderResults();
+      $("count").textContent = `${places.length} ${plural(places.length, "miejsce", "miejsca", "miejsc")} · ${routes.length} ${plural(routes.length, "trasa", "trasy", "tras")}`;
+    }
+    function renderRouteList(routes) {
+      $("routes").innerHTML = routes.length ? routes.map(r => `
+        <button class="item${r.id === state.routeId ? " active" : ""}" data-id="${r.id}">
+          <span class="dot" style="background:${r.color}"></span>
+          <span><b>${r.name}</b><small>${STARTS[r.start].icon} ${STARTS[r.start].iata} · ${r.dayCount} ${plural(r.dayCount, "dzień", "dni", "dni")} · ${zl(r.cost.total)} na miejscu</small></span>
+        </button>`).join("") : `<p class="note">Brak tras dla tych filtrów. Zwiększ budżet lub czas.</p>`;
+    }
+    function renderResults() {
+      const box = $("results");
+      if (!state.query.trim() || state.dismissed) { box.hidden = true; return; }
+      const items = [
+        ...last.routes.slice(0, 3).map(r => `
+          <button class="item" data-type="route" data-id="${r.id}"><span class="dot" style="background:${r.color}"></span>
+            <span><b>🧭 ${r.name}</b><small>Trasa · ${zl(r.cost.total)} · ${r.dayCount} ${plural(r.dayCount, "dzień", "dni", "dni")}</small></span></button>`),
+        ...last.places.slice(0, 6).map(f => { const p = f.properties; return `
+          <button class="item" data-type="place" data-id="${p.id}"><span class="dot" style="background:${band(PLACE_BANDS, p.price_pln).color}"></span>
+            <span><b>${CATEGORIES[p.category].icon} ${p.name}</b><small>${REGIONS[p.region].label} · ${zl(p.price_pln)}</small></span></button>`; }),
+      ];
+      box.innerHTML = items.length ? items.join("") : `<div class="empty">Nic nie znaleziono. Spróbuj innej nazwy albo poluzuj filtry.</div>`;
+      box.hidden = false;
+    }
+
+    /* ============ POGODA (Open-Meteo, bez klucza) ============ */
+    const CLIMATE_FROM = 2021, CLIMATE_TO = 2025;     // lata, z których liczymy średnie klimatyczne
+    const weatherCache = {};
+    async function getWeatherNow(region) {            // aktualna pogoda + prognoza na 7 dni
+      const c = weatherCache[region];
+      if (c && Date.now() - c.at < 30 * 60e3) return c.data;
+      const r = REGIONS[region];
+      const url = "https://api.open-meteo.com/v1/forecast?latitude=" + r.lat + "&longitude=" + r.lon +
+        "&current=temperature_2m,weather_code,wind_speed_10m" +
+        "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max" +
+        "&forecast_days=7&timezone=auto";
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      weatherCache[region] = { at: Date.now(), data };
+      return data;
+    }
+    async function getClimate(region) {               // dzienne dane historyczne z kilku lat (do średnich miesięcznych)
+      const key = `climate:${region}:${CLIMATE_FROM}-${CLIMATE_TO}`;
+      const cached = lsGet(key);
+      if (cached && cached.time) return cached;
+      const r = REGIONS[region];
+      const url = "https://archive-api.open-meteo.com/v1/archive?latitude=" + r.lat + "&longitude=" + r.lon +
+        "&start_date=" + CLIMATE_FROM + "-01-01&end_date=" + CLIMATE_TO + "-12-31" +
+        "&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,sunshine_duration&timezone=auto";
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const daily = (await res.json()).daily;
+      lsSet(key, daily);
+      return daily;
+    }
+    async function getForecastRange(region, from, to) {
+      const r = REGIONS[region];
+      const url = "https://api.open-meteo.com/v1/forecast?latitude=" + r.lat + "&longitude=" + r.lon +
+        "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum" +
+        "&start_date=" + from + "&end_date=" + to + "&timezone=auto";
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return (await res.json()).daily;
+    }
+    function monthlyStats(d) {       // średnie miesięczne: temperatura, dni z opadem >= 1 mm, godziny słońca dziennie
+      const years = new Set(d.time.map(t => t.slice(0, 4))).size || 1;
+      const m = Array.from({ length: 12 }, () => ({ tmax: [], tmin: [], rainDays: 0, sun: [] }));
+      d.time.forEach((t, i) => {
+        const o = m[+t.slice(5, 7) - 1];
+        if (d.temperature_2m_max[i] != null) o.tmax.push(d.temperature_2m_max[i]);
+        if (d.temperature_2m_min[i] != null) o.tmin.push(d.temperature_2m_min[i]);
+        if ((d.precipitation_sum[i] ?? 0) >= 1) o.rainDays++;
+        if (d.sunshine_duration[i] != null) o.sun.push(d.sunshine_duration[i] / 3600);
+      });
+      return m.map(o => ({ tmax: avg(o.tmax), tmin: avg(o.tmin), rainDays: o.rainDays / years, sun: avg(o.sun) }));
+    }
+    function periodStats(d, from, to) {   // średnie dla terminu (te same dni kalendarzowe we wszystkich latach)
+      const set = new Set();
+      for (let t = Date.parse(from + "T00:00:00Z"); t <= Date.parse(to + "T00:00:00Z"); t += 864e5)
+        set.add(new Date(t).toISOString().slice(5, 10));
+      const years = new Set(d.time.map(t => t.slice(0, 4))).size || 1;
+      const tmax = [], tmin = [], sun = []; let rain = 0;
+      d.time.forEach((t, i) => {
+        if (!set.has(t.slice(5, 10))) return;
+        if (d.temperature_2m_max[i] != null) tmax.push(d.temperature_2m_max[i]);
+        if (d.temperature_2m_min[i] != null) tmin.push(d.temperature_2m_min[i]);
+        if ((d.precipitation_sum[i] ?? 0) >= 1) rain++;
+        if (d.sunshine_duration[i] != null) sun.push(d.sunshine_duration[i] / 3600);
+      });
+      return { tmax: avg(tmax), tmin: avg(tmin), sun: avg(sun), rainDays: rain / years, days: set.size };
+    }
+    let wbToken = 0;
+    async function updateWeatherBar() {
+      const box = $("ibWeather"), token = ++wbToken;
+      box.textContent = "Ładuję pogodę…";
+      try {
+        const w = await getWeatherNow(app.region);
+        if (token !== wbToken) return;
+        const c = w.current, d = w.daily;
+        const chips = d.time.slice(0, 5).map((t, i) => {
+          const wd = i === 0 ? "dziś" : WEEKDAYS[new Date(t + "T12:00:00").getDay()];
+          const pp = d.precipitation_probability_max ? d.precipitation_probability_max[i] : null;
+          return `<span class="wchip" title="${fmtDay(t)}">${wd}<i>${wmoIcon(d.weather_code[i])}</i><b>${rnd(d.temperature_2m_max[i])}°</b><small>${rnd(d.temperature_2m_min[i])}° · ${pp == null ? "–" : pp + "%"}</small></span>`;
+        });
+        box.innerHTML = `<span class="wnow">${wmoIcon(c.weather_code)} <b>${rnd(c.temperature_2m)}°</b><small>teraz · wiatr ${rnd(c.wind_speed_10m)} km/h</small></span>` + chips.join("");
+      } catch (e) {
+        if (token === wbToken) box.textContent = "Pogoda niedostępna (" + e.message + ")";
+      }
+    }
+    function setRegion(key) {
+      app.region = key;
+      $("ibRegion").value = key;
+      if ($("wRegion")) $("wRegion").value = key;
+      updateWeatherBar();
+      if (!$("when").hidden) loadClimate();
+    }
+
+    /* ============ LOTY: API cen (Travelpayouts/Aviasales) + własne poprawki + ceny przykładowe ============ */
+    const flightStatus = {}, flightErr = {};    // klucz "WAW-TIA" -> "loading" | "ok" ; komunikat błędu
+    const sampleFor = (o, d) => SAMPLE_FLIGHTS.map(v => Math.round(v * AIRPORTS[o].k * STARTS[d].k / 10) * 10);
+    function flightMonths(o, d) {                // dla 12 miesięcy: { price, src } gdzie src = manual | api | sample
+      const ov = lsGet(`fo:${o}-${d}`) || {};
+      const api = (lsGet(`fapi:${o}-${d}`) || {}).values || [];
+      return sampleFor(o, d).map((base, i) =>
+        ov[i] > 0 ? { price: ov[i], src: "manual" } : api[i] > 0 ? { price: api[i], src: "api" } : { price: base, src: "sample" });
+    }
+    function flightLink(i) {
+      const now = new Date(), year = i > now.getMonth() ? now.getFullYear() : now.getFullYear() + 1;
+      return "https://www.google.com/travel/flights?q=" +
+        encodeURIComponent(`Flights from ${app.origin} to ${app.dest} in ${MONTHS_EN[i]} ${year}`);
+    }
+    async function fetchFlightsApi(o, d) {
+      const token = lsGet("tpToken");
+      const values = Array(12).fill(null), now = new Date();
+      const jobs = Array.from({ length: 12 }, (_, k) => {
+        const dt = new Date(now.getFullYear(), now.getMonth() + 1 + k, 1);
+        return { idx: dt.getMonth(), ym: dt.getFullYear() + "-" + String(dt.getMonth() + 1).padStart(2, "0") };
+      });
+      for (let i = 0; i < jobs.length; i += 4) {           // po 4 zapytania naraz
+        await Promise.all(jobs.slice(i, i + 4).map(async j => {
+          const url = FLIGHTS_API_BASE + "/aviasales/v3/prices_for_dates?origin=" + o + "&destination=" + d +
+            "&departure_at=" + j.ym + "&return_at=" + j.ym + "&one_way=false&unique=false&sorting=price&direct=false&cy=pln&limit=1&page=1" +
+            "&token=" + encodeURIComponent(token);
+          const res = await fetch(url);
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          const json = await res.json();
+          if (json.success === false) throw new Error(json.error || "błąd API");
+          const first = (json.data || [])[0];
+          if (first && first.price > 0) values[j.idx] = Math.round(first.price);
+        }));
+      }
+      lsSet(`fapi:${o}-${d}`, { at: Date.now(), values });
+    }
+    async function ensureFlights(o = app.origin, d = app.dest, force = false) {
+      const key = `${o}-${d}`;
+      if (!lsGet("tpToken") || flightStatus[key] === "loading") return;
+      const cached = lsGet(`fapi:${key}`);
+      if (!force && cached && Date.now() - cached.at < 12 * 3600e3) return;
+      if (!force && flightErr[key]) return;                // nie ponawiaj automatycznie po błędzie
+      flightStatus[key] = "loading"; flightErr[key] = null; refreshFlightUI();
+      try { await fetchFlightsApi(o, d); flightStatus[key] = "ok"; }
+      catch (e) {
+        flightStatus[key] = "err";
+        flightErr[key] = e.name === "TypeError"
+          ? "Przeglądarka zablokowała zapytanie (CORS) albo brak sieci. Ustaw FLIGHTS_API_BASE na własny proxy."
+          : e.message;
+      }
+      refreshFlightUI();
+    }
+    function updateFlightInfobar() {
+      const m = flightMonths(app.origin, app.dest);
+      let bi = 0; m.forEach((x, i) => { if (x.price < m[bi].price) bi = i; });
+      const tag = { api: "API", manual: "własne", sample: "przykładowe" }[m[bi].src];
+      const loading = flightStatus[`${app.origin}-${app.dest}`] === "loading" ? ", ładuję…" : "";
+      $("ibFlight").innerHTML = `✈️ <b>${app.origin} → ${app.dest}</b> od <b>${m[bi].price} zł</b> <small>(${MONTHS[bi]}, ${tag}${loading})</small>`;
+    }
+    function refreshFlightUI() {
+      updateFlightInfobar();
+      if (!$("when").hidden) { renderWhenTable(); updateFlightStatus(); updatePeriod(); }
+      const r = routeById(state.routeId);
+      if (r) fillRouteWhen(r);
+    }
+    function setOrigin(code) {
+      app.origin = code; lsSet("origin", code);
+      $("ibOrigin").value = code; if ($("wAirport")) $("wAirport").value = code;
+      updateFlightInfobar(); ensureFlights();
+      if (!$("when").hidden) { renderWhenTable(); updatePeriod(); }
+      const r = routeById(state.routeId);
+      if (r) fillRouteWhen(r);
+    }
+    function setDest(code) {
+      app.dest = code; if ($("wDest")) $("wDest").value = code;
+      updateFlightInfobar(); ensureFlights();
+      if (!$("when").hidden) { renderWhenTable(); updateFlightStatus(); updatePeriod(); }
+    }
+
+    /* --- wskaźnik miesiąca 0-100: pogoda (temperatura blisko idealnej, mało deszczu) + cena lotu wg wagi --- */
+    const whenState = { weight: 35, from: "", to: "", stats: null };
+    function scoreFrom(stats, ideal, prices, weightPct) {
+      const valid = prices.filter(p => p > 0);
+      const min = valid.length ? Math.min(...valid) : 0, max = valid.length ? Math.max(...valid) : 0;
+      const w = weightPct / 100;
+      return stats.map((s, i) => {
+        const temp = 1 - Math.min(Math.abs(s.tmax - ideal) / 10, 1);
+        const rain = 1 - Math.min(s.rainDays / 12, 1);
+        const weather = 0.6 * temp + 0.4 * rain;
+        const p = prices[i];
+        const price = p > 0 ? (max > min ? 1 - (p - min) / (max - min) : 1) : 0.5;
+        return Math.round(100 * ((1 - w) * weather + w * price));
+      });
+    }
+    const topIdx = sc => [...sc.keys()].sort((a, b) => sc[b] - sc[a]).slice(0, 3);
+
+    /* ============ KARTA TRASY ============ */
+    let sheetToken = 0;
+    function routeSheetHtml(r) {
+      const s = STARTS[r.start], c = r.cost;
+      let n = 0;
+      const plan = r.days.map(d => `<div class="day"><b>${d.title}</b>${d.note ? `<p>${d.note}</p>` : ""}<ol class="stops">${d.ids.map(id => {
+        n++; const p = P[id].properties;
+        return `<li><button data-stop="${id}"><span class="num" style="background:${band(PLACE_BANDS, p.price_pln).color}">${n}</span>
+          <span>${p.name}<small>${zl(p.price_pln)} · ${fmtMin(p.duration_min)}</small></span></button></li>`;
+      }).join("")}</ol></div>`).join("");
+      return `
+        <div class="rs-head"><span class="dot" style="background:${r.color}"></span><b>${r.name}</b>
+          <button id="rsClose" aria-label="Zamknij trasę">✕</button></div>
+        <div class="rs-chips">
+          <span>💰 ${zl(c.total)} na miejscu</span>
+          <span>📅 ${r.dayCount} ${plural(r.dayCount, "dzień", "dni", "dni")}</span>
+          <span>⏱ ${fmtMin(r.duration)} zwiedzania</span>
+          <span>${s.icon} start: ${s.iata}</span>
+        </div>
+        <div class="tags">${r.tags.map(t => `<span class="tag">${t}</span>`).join("")}</div>
+        <h4>Dlaczego warto</h4><p>${r.description}</p>
+        <h4>Dla kogo</h4><p>${r.forWho}</p>
+        <h4>Jak zacząć</h4>
+        <p><b>${s.label}</b><br>${r.transfer.how}<br>Ze startu do pierwszego punktu: ok. ${fmtMin(r.transfer.min)}, ok. ${zl(r.transfer.cost)}.</p>
+        <h4>Plan</h4>${plan}
+        <h4>Koszty na osobę (orientacyjnie)</h4>
+        <table class="mini"><tbody>
+          <tr><td>Wejścia i bilety</td><td>${zl(c.entries)}</td></tr>
+          <tr><td>Dojazd ze startu do 1. punktu</td><td>${zl(c.transfer)}</td></tr>
+          <tr><td>Transport na trasie (szac.)</td><td>${zl(c.local)}</td></tr>
+          <tr><td>Jedzenie (${r.dayCount} × ${FOOD_PER_DAY_PLN} zł)</td><td>${zl(c.food)}</td></tr>
+          <tr><td>Noclegi (${r.dayCount - 1} × ${LODGING_PER_NIGHT_PLN} zł)</td><td>${zl(c.lodging)}</td></tr>
+          <tr><td><b>Razem na miejscu</b></td><td><b>${zl(c.total)}</b></td></tr>
+        </tbody></table>
+        <p class="note">Do tego lot do ${s.iata}. Stawki za jedzenie i noclegi to ustawiane przez Ciebie założenia, nie oferty.</p>
+        <h4>Kiedy jechać</h4><div id="rsWhen">Ładuję…</div>
+        <h4>Wskazówki</h4><ul>${r.tips.map(t => `<li>${t}</li>`).join("")}</ul>
+        <p class="note">Linia na mapie łączy punkty prosto, to nie jest droga dojazdu. Ceny i czasy są przybliżone.</p>`;
+    }
+    function renderRouteSheet(r) {
+      const box = $("routesheet");
+      if (!r) { box.hidden = true; return; }
+      box.hidden = false;
+      box.innerHTML = routeSheetHtml(r);
+      box.scrollTop = 0;
+      $("rsClose").onclick = clearRoute;
+      box.querySelectorAll("[data-stop]").forEach(b => b.onclick = () => {
+        map.setView(toLatLng(P[b.dataset.stop]), 14);
+        if (markers[b.dataset.stop]) markers[b.dataset.stop].openPopup();
+      });
+      fillRouteWhen(r);
+    }
+    async function fillRouteWhen(r) {      // sekcja "Kiedy jechać": klimat regionu + loty do punktu startowego + prognoza
+      const token = ++sheetToken, box = $("rsWhen");
+      if (!box) return;
+      try {
+        const [clim, fc] = await Promise.all([getClimate(r.region), getWeatherNow(r.region).catch(() => null)]);
+        if (token !== sheetToken || !$("rsWhen")) return;
+        const stats = monthlyStats(clim), s = STARTS[r.start];
+        const fm = flightMonths(app.origin, s.iata), prices = fm.map(x => x.price);
+        const sc = scoreFrom(stats, REGIONS[r.region].ideal, prices, whenState.weight), top = topIdx(sc);
+        const cheapest = prices.indexOf(Math.min(...prices));
+        const srcTag = { api: "API", manual: "własne", sample: "przykładowe" };
+        let html = `<p>${r.seasonNote}</p><div class="months">${top.map(i => `<div class="mchip"><b>${MONTHS[i]}</b>
+          <span>${rnd(stats[i].tmax)}° / ${rnd(stats[i].tmin)}°</span><span>${stats[i].rainDays.toFixed(0)} dni z deszczem</span>
+          <span>lot ${app.origin}→${s.iata}: ${prices[i]} zł <small>(${srcTag[fm[i].src]})</small></span></div>`).join("")}</div>
+          <p>Najtańszy lot: <b>${MONTHS[cheapest]}</b> (${prices[cheapest]} zł, ${srcTag[fm[cheapest].src]}). Pogoda: średnie z ${CLIMATE_FROM}–${CLIMATE_TO} dla regionu „${REGIONS[r.region].label}”. Zmienisz lotnisko wylotu w pasku nad mapą.</p>`;
+        if (fc) {
+          const d = fc.daily, wet = d.precipitation_probability_max ? d.precipitation_probability_max.filter(x => x >= 50).length : 0;
+          html += `<p><b>Prognoza teraz (7 dni):</b> ${rnd(Math.min(...d.temperature_2m_max))}–${rnd(Math.max(...d.temperature_2m_max))}° w dzień, deszcz prawdopodobny w ${wet} z 7 dni.</p>`;
+        }
+        box.innerHTML = html;
+      } catch (e) {
+        if (token === sheetToken && $("rsWhen")) $("rsWhen").textContent = "Nie udało się pobrać pogody: " + e.message;
+      }
+    }
+
+    /* ============ AKCJE ============ */
+    function closeDrawer() { $("panel").classList.remove("open"); }
+    function selectRoute(id) {
+      const r = routeById(id);
+      state.routeId = id; state.dismissed = true;
+      closeDrawer(); $("q").blur();
+      setRegion(r.region);
+      app.dest = r.start; if ($("wDest")) $("wDest").value = app.dest;
+      ensureFlights(); updateFlightInfobar();
+      render();
+      renderRouteSheet(r);
+      const mobile = window.innerWidth <= 700;
+      map.fitBounds(L.latLngBounds([...r.latlngs, [STARTS[r.start].lat, STARTS[r.start].lon]]), {
+        paddingTopLeft: [40, 80],
+        paddingBottomRight: mobile ? [40, Math.round(window.innerHeight * 0.5)] : [Math.min(440, window.innerWidth * 0.4) + 20, 40],
+        maxZoom: 13 });
+    }
+    function clearRoute() {
+      state.routeId = null; app.dest = "TIA"; if ($("wDest")) $("wDest").value = "TIA";
+      render(); renderRouteSheet(null); updateFlightInfobar(); ensureFlights();
+    }
+    function goToPlace(id) {
+      state.dismissed = true; $("q").blur();
+      if (state.routeId) { state.routeId = null; renderRouteSheet(null); }
+      render();
+      map.setView(toLatLng(P[id]), Math.max(map.getZoom(), 12));
+      if (markers[id]) markers[id].openPopup();
+    }
+
+    /* ============ PANEL ============ */
+    function checkboxes(items, set) {
+      const box = document.createElement("div");
+      for (const [key, val] of Object.entries(items)) {
+        const label = document.createElement("label"); label.className = "chk";
+        const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = set.has(key);
+        cb.onchange = () => { cb.checked ? set.add(key) : set.delete(key); render(); };
+        label.append(cb, val.label);
+        box.append(label);
+      }
+      return box;
+    }
+    function legendRow(title, bands) {
+      return `<div class="subhead">${title}</div><div class="legend-row">${bands.map(b =>
+        `<span><i class="dot" style="background:${b.color}"></i>${b.label}</span>`).join("")}</div>`;
+    }
+    function resetAll() {
+      state.query = ""; state.budget = null; state.maxTime = Infinity; state.dismissed = false;
+      state.categories = new Set(Object.keys(CATEGORIES)); state.regions = new Set(Object.keys(REGIONS));
+      $("q").value = "";
+      if (state.routeId) { state.routeId = null; renderRouteSheet(null); app.dest = "TIA"; updateFlightInfobar(); }
+      buildPanel(); render();
+    }
+    function buildPanel() {
+      const panel = $("panel");
+      panel.innerHTML = `
+        <h2>Albania: mapa turystyczna</h2>
+        <p class="count" id="count"></p>
+        <fieldset><legend>Twój budżet (zł na osobę)</legend>
+          <input id="budget" type="number" inputmode="numeric" min="0" step="10" placeholder="bez limitu">
+          <p class="note">Miejsca: cena wejścia. Trasy: koszt całej trasy na miejscu, bez lotu.</p></fieldset>
+        <fieldset><legend>Czas zwiedzania</legend><select id="time"></select></fieldset>
+        <fieldset><legend>Trasy</legend><div id="routes"></div></fieldset>
+        <details><summary>Kategorie i regiony</summary>
+          <div class="subhead">Kategorie</div><div id="cats"></div>
+          <div class="subhead">Regiony</div><div id="regs"></div></details>
+        <fieldset><legend>Kolor oznacza cenę</legend>
+          ${legendRow("Miejsca (wejście)", PLACE_BANDS)}${legendRow("Trasy (koszt na miejscu)", ROUTE_BANDS)}
+          <p class="note">Ceny orientacyjne, sprawdź przed wyjazdem.</p></fieldset>
+        <div class="footer"><button id="reset">Wyczyść</button><button id="apply">Pokaż na mapie</button></div>`;
+
+      $("budget").value = state.budget ?? "";
+      $("budget").oninput = e => { const v = e.target.value; state.budget = v === "" ? null : Math.max(0, Number(v)); render(); };
+      const sel = $("time");
+      TIME_OPTIONS.forEach((o, i) => sel.add(new Option(o.label, i)));
+      sel.selectedIndex = Math.max(0, TIME_OPTIONS.findIndex(o => o.max === state.maxTime));
+      sel.onchange = () => { state.maxTime = TIME_OPTIONS[+sel.value].max; render(); };
+      $("cats").append(checkboxes(CATEGORIES, state.categories));
+      $("regs").append(checkboxes(REGIONS, state.regions));
+      $("routes").onclick = e => { const b = e.target.closest("[data-id]"); if (b) selectRoute(b.dataset.id); };
+      $("apply").onclick = closeDrawer;
+      $("reset").onclick = resetAll;
+    }
+
+    /* ============ WYSZUKIWARKA ============ */
+    const q = $("q");
+    q.addEventListener("input", () => { state.query = q.value; state.dismissed = false; render(); });
+    q.addEventListener("focus", () => { state.dismissed = false; renderResults(); });
+    q.addEventListener("keydown", e => { if (e.key === "Escape") { state.dismissed = true; renderResults(); q.blur(); } });
+    $("results").addEventListener("click", e => {
+      const b = e.target.closest("[data-id]");
+      if (!b) return;
+      b.dataset.type === "route" ? selectRoute(b.dataset.id) : goToPlace(b.dataset.id);
+    });
+    $("toggle").onclick = () => $("panel").classList.toggle("open");
+
+    /* ============ KIEDY JECHAĆ (okno): tabela miesięcy, termin, API lotów ============ */
+    let climateToken = 0, periodToken = 0;
+    function renderWhenTable() {
+      const t = $("wTable");
+      if (!whenState.stats) { t.innerHTML = ""; return; }
+      const fm = flightMonths(app.origin, app.dest);
+      t.innerHTML = `<thead><tr><th>Miesiąc</th><th>Temp. max / min</th><th>Dni z deszczem</th><th>Słońce dziennie</th>
+          <th>Lot tam i z powrotem (zł)</th><th>Wskaźnik</th></tr></thead><tbody>` +
+        whenState.stats.map((s, i) => `<tr id="wr${i}"><td>${MONTHS[i]}</td>
+          <td>${rnd(s.tmax)}° / ${rnd(s.tmin)}°</td><td>${s.rainDays.toFixed(0)}</td><td>${s.sun == null ? "–" : s.sun.toFixed(1) + " h"}</td>
+          <td class="pcell"><input type="number" min="0" step="10" data-m="${i}" value="${fm[i].price}" aria-label="Cena lotu, ${MONTHS[i]}">
+            <span class="src src-${fm[i].src}" title="${{ api: "z API", manual: "wpisane przez Ciebie", sample: "przykładowe" }[fm[i].src]}">●</span>
+            <a href="${flightLink(i)}" target="_blank" rel="noopener" title="Sprawdź w Google Flights">🔎</a></td>
+          <td id="wsc${i}"></td></tr>`).join("") + "</tbody>";
+      t.querySelectorAll("input[data-m]").forEach(inp => inp.onchange = () => {
+        const key = `fo:${app.origin}-${app.dest}`, ov = lsGet(key) || {};
+        if (inp.value === "" || Number(inp.value) <= 0) delete ov[inp.dataset.m]; else ov[inp.dataset.m] = Number(inp.value);
+        lsSet(key, ov);
+        updateFlightInfobar(); renderWhenTable(); updatePeriod();
+        const r = routeById(state.routeId); if (r) fillRouteWhen(r);
+      });
+      paintScores();
+    }
+    function paintScores() {
+      if (!whenState.stats) return;
+      const prices = flightMonths(app.origin, app.dest).map(x => x.price);
+      const sc = scoreFrom(whenState.stats, REGIONS[app.region].ideal, prices, whenState.weight), top = topIdx(sc);
+      sc.forEach((v, i) => {
+        $("wsc" + i).textContent = (top.includes(i) ? "★ " : "") + v;
+        $("wr" + i).classList.toggle("best", top.includes(i));
+      });
+    }
+    function updateFlightStatus() {
+      const key = `${app.origin}-${app.dest}`, st = flightStatus[key], err = flightErr[key];
+      $("wFlightStatus").textContent = !lsGet("tpToken") ? "Bez tokenu pokazuję ceny przykładowe (szare kropki)."
+        : st === "loading" ? "Pobieram ceny z API…"
+        : err ? "⚠️ " + err
+        : "Ceny z API: najtańsze bilety znalezione przez użytkowników Aviasales (cache do 48 h), odświeżane co 12 h.";
+    }
+    function forecastHtml(d) {
+      const rows = d.time.map((t, i) => `<tr><td>${fmtDay(t)}</td><td>${wmoIcon(d.weather_code[i])}</td>
+        <td>${rnd(d.temperature_2m_max[i])}° / ${rnd(d.temperature_2m_min[i])}°</td><td>${d.precipitation_sum[i] ?? 0} mm</td></tr>`).join("");
+      return `<b>Prognoza na ten termin</b><div class="tblwrap"><table class="mini"><tbody>${rows}</tbody></table></div>`;
+    }
+    async function updatePeriod() {
+      const box = $("wPeriod"), { from, to } = whenState, token = ++periodToken;
+      if (!from || !to) { box.textContent = "Wybierz daty wyjazdu, a pokażę pogodę i cenę lotu dla tego terminu."; return; }
+      if (to < from) { box.textContent = "Data końca jest przed początkiem."; return; }
+      if ((Date.parse(to) - Date.parse(from)) / 864e5 + 1 > 60) { box.textContent = "Wybierz termin do 60 dni."; return; }
+      const mi = +from.slice(5, 7) - 1, fm = flightMonths(app.origin, app.dest)[mi];
+      const priceTxt = `<p>Lot w ${MONTHS[mi]}: ok. <b>${fm.price} zł</b> (${app.origin} → ${app.dest}, ${{ api: "z API", manual: "własne", sample: "przykładowe" }[fm.src]}).</p>`;
+      box.textContent = "Ładuję pogodę…";
+      try {
+        let html;
+        if (from >= todayStr() && to <= addDays(todayStr(), 15)) {
+          html = forecastHtml(await getForecastRange(app.region, from, to));
+        } else {
+          const s = periodStats(await getClimate(app.region), from, to);
+          html = `<b>Średnio w tym terminie (${CLIMATE_FROM}–${CLIMATE_TO})</b>
+            <p>Temperatura max ${rnd(s.tmax)}°, min ${rnd(s.tmin)}°. Dni z deszczem: ok. ${s.rainDays.toFixed(0)} z ${s.days}.
+            Słońce: ${s.sun == null ? "–" : s.sun.toFixed(1)} h dziennie. To średnia historyczna, nie prognoza (prognoza jest dostępna na najbliższe 16 dni).</p>`;
+        }
+        if (token === periodToken) box.innerHTML = html + priceTxt;
+      } catch (e) {
+        if (token === periodToken) box.textContent = "Nie udało się pobrać pogody: " + e.message;
+      }
+    }
+    async function loadClimate() {
+      const token = ++climateToken;
+      $("wTable").innerHTML = "";
+      $("wStatus").textContent = "Ładuję dane pogodowe z Open-Meteo…";
+      try {
+        const d = await getClimate(app.region);
+        if (token !== climateToken) return;
+        whenState.stats = monthlyStats(d);
+        $("wStatus").textContent = "";
+        renderWhenTable();
+      } catch (e) {
+        if (token !== climateToken) return;
+        whenState.stats = null;
+        $("wStatus").textContent = "Nie udało się pobrać pogody (" + e.message + "). Sprawdź internet. Zapytania do Open-Meteo działają po otwarciu pliku lokalnie lub z własnego hostingu.";
+      }
+      updatePeriod();
+    }
+    function openWhen() {
+      $("when").hidden = false;
+      $("wToken").value = lsGet("tpToken") || "";
+      updateFlightStatus();
+      loadClimate(); ensureFlights();
+    }
+    function initWhen() {
+      $("when").innerHTML = `
+        <div class="sheet" role="dialog" aria-label="Kiedy jechać">
+          <div class="sheet-head"><b>Kiedy jechać do Albanii</b><button id="wClose" aria-label="Zamknij">✕</button></div>
+          <div class="grid2">
+            <label>Pogoda dla regionu<select id="wRegion"></select></label>
+            <label>Lecisz z<select id="wAirport"></select></label>
+            <label>Lecisz do<select id="wDest"></select></label>
+            <label>Waga ceny we wskaźniku: <b id="wWeightVal">${whenState.weight}%</b>
+              <input type="range" id="wWeight" min="0" max="100" step="5" value="${whenState.weight}"></label>
+            <label>Wyjazd od<input type="date" id="wFrom"></label>
+            <label>Wyjazd do<input type="date" id="wTo"></label>
+          </div>
+          <div id="wPeriod">Wybierz daty wyjazdu, a pokażę pogodę i cenę lotu dla tego terminu.</div>
+          <div class="box">
+            <label>Token API cen lotów (Travelpayouts / Aviasales, darmowy)
+              <input type="password" id="wToken" placeholder="wklej token" autocomplete="off"></label>
+            <p><button class="btn" id="wSaveToken">Zapisz i pobierz ceny</button></p>
+            <p id="wFlightStatus" class="note"></p>
+            <p class="note">Token dostaniesz po darmowej rejestracji w Travelpayouts (sekcja Data API). Zapisuje się tylko w tej przeglądarce.
+              Kropki przy cenach: zielona = z API, niebieska = wpisane przez Ciebie, szara = przykładowe.</p>
+          </div>
+          <p id="wStatus" class="note"></p>
+          <div class="tblwrap"><table id="wTable"></table></div>
+          <p class="note">Wskaźnik 0–100 łączy pogodę (temperatura blisko idealnej dla regionu, mało dni z deszczem) i cenę lotu, zgodnie z wagą.
+            ★ oznacza 3 najlepsze miesiące. Pogoda to średnie z lat ${CLIMATE_FROM}–${CLIMATE_TO} (Open-Meteo). To wskazówka, nie gwarancja.</p>
+        </div>`;
+      Object.entries(REGIONS).forEach(([k, r]) => $("wRegion").add(new Option(r.label, k)));
+      Object.entries(AIRPORTS).forEach(([k, a]) => $("wAirport").add(new Option(a.label, k)));
+      Object.entries(STARTS).forEach(([k, s]) => $("wDest").add(new Option(s.short, k)));
+      $("wRegion").value = app.region; $("wAirport").value = app.origin; $("wDest").value = app.dest;
+      $("wRegion").onchange = e => setRegion(e.target.value);
+      $("wAirport").onchange = e => setOrigin(e.target.value);
+      $("wDest").onchange = e => setDest(e.target.value);
+      $("wFrom").onchange = e => { whenState.from = e.target.value; if (!whenState.to || whenState.to < whenState.from) { whenState.to = whenState.from; $("wTo").value = whenState.to; } updatePeriod(); };
+      $("wTo").onchange = e => { whenState.to = e.target.value; updatePeriod(); };
+      $("wWeight").oninput = e => { whenState.weight = +e.target.value; $("wWeightVal").textContent = whenState.weight + "%"; paintScores(); };
+      $("wSaveToken").onclick = () => {
+        const v = $("wToken").value.trim();
+        lsSet("tpToken", v || null);
+        Object.keys(flightErr).forEach(k => delete flightErr[k]);
+        updateFlightStatus();
+        if (v) ensureFlights(app.origin, app.dest, true);
+      };
+      const close = () => { $("when").hidden = true; };
+      $("wClose").onclick = close;
+      $("when").addEventListener("click", e => { if (e.target === $("when")) close(); });
+      document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("when").hidden) close(); });
+      $("whenBtn").onclick = openWhen;
+    }
+
+    /* ============ PASEK NAD MAPĄ ============ */
+    function initInfobar() {
+      Object.entries(REGIONS).forEach(([k, r]) => $("ibRegion").add(new Option(r.label, k)));
+      Object.entries(AIRPORTS).forEach(([k, a]) => $("ibOrigin").add(new Option("z " + a.label, k)));
+      $("ibRegion").value = app.region; $("ibOrigin").value = app.origin;
+      $("ibRegion").onchange = e => setRegion(e.target.value);
+      $("ibOrigin").onchange = e => setOrigin(e.target.value);
+      $("ibWeather").onclick = openWhen;
+      $("ibFlight").onclick = openWhen;
+    }
+
+    /* ============ START ============ */
+    buildPanel();
+    render();
+    initInfobar();
+    initWhen();
+    updateWeatherBar();
+    updateFlightInfobar();
+    ensureFlights();
+</script>
+</body>
+</html>
